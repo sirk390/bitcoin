@@ -27,7 +27,10 @@ static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)
 //  (4) message start
 //  (12) command
 //  (4) size
+//  (4) request/reply id or NOTIFICATION
 //  (4) checksum
+
+#define NOTIFICATION 0
 
 extern unsigned char pchMessageStart[4];
 
@@ -35,7 +38,7 @@ class CMessageHeader
 {
     public:
         CMessageHeader();
-        CMessageHeader(const char* pszCommand, unsigned int nMessageSizeIn);
+        CMessageHeader(const char* pszCommand, unsigned int nMessageSizeIn, unsigned int nRequestIdIn);
 
         std::string GetCommand() const;
         bool IsValid() const;
@@ -45,6 +48,8 @@ class CMessageHeader
              READWRITE(FLATDATA(pchMessageStart));
              READWRITE(FLATDATA(pchCommand));
              READWRITE(nMessageSize);
+             if (nVersion >= 61000)
+             READWRITE(nRequestId);
              READWRITE(nChecksum);
             )
 
@@ -54,6 +59,7 @@ class CMessageHeader
         char pchMessageStart[sizeof(::pchMessageStart)];
         char pchCommand[COMMAND_SIZE];
         unsigned int nMessageSize;
+        unsigned int nRequestId;
         unsigned int nChecksum;
 };
 

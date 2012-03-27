@@ -2153,7 +2153,7 @@ bool static AlreadyHave(CTxDB& txdb, const CInv& inv)
 unsigned char pchMessageStart[4] = { 0xf9, 0xbe, 0xb4, 0xd9 };
 
 
-bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
+bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, unsigned int nRequestId)
 {
     static map<CService, vector<unsigned char> > mapReuseKey;
     RandAddSeedPerfmon();
@@ -2220,7 +2220,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         AddTimeData(pfrom->addr, nTime);
 
         // Change version
-        pfrom->PushMessage("verack");
+        pfrom->PushMessage("verack", nRequestId);
         pfrom->vSend.SetVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
 
         if (!pfrom->fInbound)
@@ -2237,7 +2237,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // Get recent addresses
             if (pfrom->nVersion >= 31402 || mapAddresses.size() < 1000)
             {
-                pfrom->PushMessage("getaddr");
+                pfrom->PushMessage("getaddr", 1);
                 pfrom->fGetAddr = true;
             }
         }
@@ -2401,7 +2401,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 {
                     CBlock block;
                     block.ReadFromDisk((*mi).second);
-                    pfrom->PushMessage("block", block);
+                    pfrom->PushMessage("block", nRequestId, block);
 
                     // Trigger them to send a getblocks request for the next batch of inventory
                     if (inv.hash == pfrom->hashContinue)
@@ -2411,7 +2411,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                         // wait for other stuff first.
                         vector<CInv> vInv;
                         vInv.push_back(CInv(MSG_BLOCK, hashBestChain));
-                        pfrom->PushMessage("inv", vInv);
+                        pfrom->PushMessage("inv", NOTIFICATION, vInv);
                         pfrom->hashContinue = 0;
                     }
                 }
@@ -2423,7 +2423,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 {
                     map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
                     if (mi != mapRelay.end())
-                        pfrom->PushMessage(inv.GetCommand(), (*mi).second);
+                        pfrom->PushMessage(inv.GetCommand(), nRequestId, (*mi).second);
                 }
             }
 
@@ -2448,6 +2448,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         int nLimit = 500 + locator.GetDistanceBack();
         unsigned int nBytes = 0;
         printf("getblocks %d to %s limit %d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString().substr(0,20).c_str(), nLimit);
+        std::vector<CInv> vInvResult;
         for (; pindex; pindex = pindex->pnext)
         {
             if (pindex->GetBlockHash() == hashStop)
@@ -2455,7 +2456,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 printf("  getblocks stopping at %d %s (%u bytes)\n", pindex->nHeight, pindex->GetBlockHash().ToString().substr(0,20).c_str(), nBytes);
                 break;
             }
-            pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+            vInvResult.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash())); 
             CBlock block;
             block.ReadFromDisk(pindex, true);
             nBytes += block.GetSerializeSize(SER_NETWORK);
@@ -2468,6 +2469,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 break;
             }
         }
+        pfrom->PushMessage("inv", nRequestId, vInvResult);
     }
 
 
@@ -2503,7 +2505,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                 break;
         }
-        pfrom->PushMessage("headers", vHeaders);
+        pfrom->PushMessage("headers", nRequestId, vHeaders);
     }
 
 
@@ -2588,6 +2590,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         // Nodes rebroadcast an addr every 24 hours
         pfrom->vAddrToSend.clear();
         int64 nSince = GetAdjustedTime() - 3 * 60 * 60; // in the last 3 hours
+        
+        std::vector<CAddress> vAddressesResult;
         CRITICAL_BLOCK(cs_mapAddresses)
         {
             unsigned int nCount = 0;
@@ -2601,9 +2605,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             {
                 const CAddress& addr = item.second;
                 if (addr.nTime > nSince && GetRand(nCount) < 2500)
-                    pfrom->PushAddress(addr);
+                    vAddressesResult.push_back(addr);
             }
         }
+        pfrom->PushMessage("addr", nRequestId, vAddressesResult);
     }
 
 
@@ -2614,7 +2619,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         if (!GetBoolArg("-allowreceivebyip"))
         {
-            pfrom->PushMessage("reply", hashReply, (int)2, string(""));
+            pfrom->PushMessage("reply", nRequestId, hashReply, (int)2, string(""));
             return true;
         }
 
@@ -2630,7 +2635,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         // Send back approval of order and pubkey to use
         CScript scriptPubKey;
         scriptPubKey << mapReuseKey[pfrom->addr] << OP_CHECKSIG;
-        pfrom->PushMessage("reply", hashReply, (int)0, scriptPubKey);
+        pfrom->PushMessage("reply", nRequestId, hashReply, (int)0, scriptPubKey);
     }
 
 
@@ -2770,7 +2775,7 @@ bool ProcessMessages(CNode* pfrom)
         try
         {
             CRITICAL_BLOCK(cs_main)
-                fRet = ProcessMessage(pfrom, strCommand, vMsg);
+                fRet = ProcessMessage(pfrom, strCommand, vMsg, hdr.nRequestId);
             if (fShutdown)
                 return true;
         }
@@ -2816,7 +2821,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 
         // Keep-alive ping
         if (pto->nLastSend && GetTime() - pto->nLastSend > 30 * 60 && pto->vSend.empty())
-            pto->PushMessage("ping");
+            pto->PushMessage("ping", 1);
 
         // Resend wallet transactions that haven't gotten in a block yet
         ResendWalletTransactions();
@@ -2890,14 +2895,14 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     // receiver rejects addr messages larger than 1000
                     if (vAddr.size() >= 1000)
                     {
-                        pto->PushMessage("addr", vAddr);
+                        pto->PushMessage("addr", NOTIFICATION, vAddr);
                         vAddr.clear();
                     }
                 }
             }
             pto->vAddrToSend.clear();
             if (!vAddr.empty())
-                pto->PushMessage("addr", vAddr);
+                pto->PushMessage("addr", NOTIFICATION, vAddr);
         }
 
 
@@ -2948,7 +2953,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     vInv.push_back(inv);
                     if (vInv.size() >= 1000)
                     {
-                        pto->PushMessage("inv", vInv);
+                        pto->PushMessage("inv", NOTIFICATION, vInv);
                         vInv.clear();
                     }
                 }
@@ -2956,7 +2961,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             pto->vInventoryToSend = vInvWait;
         }
         if (!vInv.empty())
-            pto->PushMessage("inv", vInv);
+            pto->PushMessage("inv", NOTIFICATION, vInv);
 
 
         //
@@ -2974,7 +2979,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {
-                    pto->PushMessage("getdata", vGetData);
+                    pto->PushMessage("getdata", 1, vGetData);
                     vGetData.clear();
                 }
             }
@@ -2982,7 +2987,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             pto->mapAskFor.erase(pto->mapAskFor.begin());
         }
         if (!vGetData.empty())
-            pto->PushMessage("getdata", vGetData);
+            pto->PushMessage("getdata", 1, vGetData);
 
     }
     return true;
