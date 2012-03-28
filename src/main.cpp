@@ -2354,25 +2354,41 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->Misbehaving(20);
             return error("message inv size() = %d", vInv.size());
         }
-
-        CTxDB txdb("r");
-        BOOST_FOREACH(const CInv& inv, vInv)
+        //result of a getblock request,  todo: check if not more than 500
+        if (pfrom->mapGetblocksRequested.find(nRequestId) != pfrom->mapGetblocksRequested.end())
         {
-            if (fShutdown)
-                return true;
-            pfrom->AddInventoryKnown(inv);
+            vector<CInv> vGetData;
+            //fill mapGetdataFromGetblocksRequested, sent PushMessage("getdata")
+            BOOST_FOREACH(const CInv& inv, vInv)
+            {
+                //request even if AlreadyHave (simpler)
+                vGetData.push_back(inv);
+                // Track requests for our stuff
+                Inventory(inv.hash);
+            }
+            if (!vGetData.empty())
+                pfrom->PushGetData(vGetData, nRequestId);           
+        }
+        //default: not the result of a getblock request
+        else
+        {
+            CTxDB txdb("r");
+            BOOST_FOREACH(const CInv& inv, vInv)
+            {
+                if (fShutdown)
+                    return true;
+                pfrom->AddInventoryKnown(inv);
 
-            bool fAlreadyHave = AlreadyHave(txdb, inv);
-            if (fDebug)
-                printf("  got inventory: %s  %s\n", inv.ToString().c_str(), fAlreadyHave ? "have" : "new");
+                bool fAlreadyHave = AlreadyHave(txdb, inv);
+                if (fDebug)
+                    printf("  got inventory: %s  %s\n", inv.ToString().c_str(), fAlreadyHave ? "have" : "new");
 
-            if (!fAlreadyHave)
-                pfrom->AskFor(inv);
-            else if (inv.type == MSG_BLOCK && mapOrphanBlocks.count(inv.hash))
-                pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(mapOrphanBlocks[inv.hash]));
+                if (!fAlreadyHave)
+                    pfrom->AskFor(inv);
 
-            // Track requests for our stuff
-            Inventory(inv.hash);
+                // Track requests for our stuff
+                Inventory(inv.hash);
+            }
         }
     }
 
@@ -2575,13 +2591,45 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         printf("received block %s\n", block.GetHash().ToString().substr(0,20).c_str());
         // block.print();
-
         CInv inv(MSG_BLOCK, block.GetHash());
         pfrom->AddInventoryKnown(inv);
-
-        if (ProcessBlock(pfrom, &block))
-            mapAlreadyAskedFor.erase(inv);
-        if (block.nDoS) pfrom->Misbehaving(block.nDoS);
+        
+        //result of a getblocks+getdata request
+        if (pfrom->mapGetdataRequested.find(nRequestId) != pfrom->mapGetdataRequested.end())
+        {
+            if (pfrom->mapGetdataRequested[nRequestId].find(inv.hash) == pfrom->mapGetdataRequested[nRequestId].end())
+                pfrom->Misbehaving(100); //hash doesn't correspond to a requested block
+            else
+            {
+                //set received
+                pfrom->mapGetdataRequested[nRequestId][inv.hash] = true;
+                ProcessBlock(pfrom, &block);
+                if (block.nDoS) 
+                    pfrom->Misbehaving(block.nDoS);
+                //if all received, send next getblocks
+                bool allReceived = true;
+                BOOST_FOREACH(const PAIRTYPE(uint256, bool)& item, pfrom->mapGetdataRequested[nRequestId])
+                    allReceived &= item.second;
+                if (allReceived)
+                {
+                    //std::pair<CBlockIndex, uint256> prevGetBlocks = mapGetblocksRequested[mapGetblocksRequestIds[nRequestId]]
+                    pfrom->mapGetblocksRequested.erase(pfrom->mapGetblocksRequestIds[nRequestId]);
+                    pfrom->mapGetdataRequested.erase(nRequestId);
+                    pfrom->mapGetblocksRequestIds.erase(nRequestId);
+                    
+                    map<uint256, CBlockIndex*>::iterator miNext = mapBlockIndex.find(inv.hash);
+                    if (miNext != mapBlockIndex.end())
+                        pfrom->PushGetBlocks(miNext->second, uint256(0));
+                }
+            }
+        }
+        //result of a getdata request or unrequested block
+        else
+        {
+            if (ProcessBlock(pfrom, &block))
+                mapAlreadyAskedFor.erase(inv);
+            if (block.nDoS) pfrom->Misbehaving(block.nDoS);
+        }
     }
 
 

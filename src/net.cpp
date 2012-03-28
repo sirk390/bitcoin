@@ -78,9 +78,34 @@ void CNode::PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd)
         return;
     pindexLastGetBlocksBegin = pindexBegin;
     hashLastGetBlocksEnd = hashEnd;
-
-    PushMessage("getblocks", 1, CBlockLocator(pindexBegin), hashEnd);
+    
+    unsigned int nRequestId;
+    do 
+    {
+        RAND_bytes((unsigned char*)&nRequestId, sizeof(nRequestId));
+    }
+    while ( mapGetblocksRequested.find(nRequestId) != mapGetblocksRequested.end());
+    mapGetblocksRequested[nRequestId] = std::pair<CBlockIndex, uint256>(*pindexBegin, hashEnd);
+    printf("getblocks %s id=%d, %d,%d,%d\n", pindexBegin->phashBlock->ToString().c_str(), nRequestId, mapGetblocksRequested.size(), mapGetdataRequested.size(), mapGetblocksRequestIds.size()); 
+    PushMessage("getblocks", nRequestId, CBlockLocator(pindexBegin), hashEnd);
 }
+
+void CNode::PushGetData(std::vector<CInv> vInv, unsigned int getblocksRequestId)
+{
+    unsigned int nRequestId;
+    do 
+    {
+        RAND_bytes((unsigned char*)&nRequestId, sizeof(nRequestId));
+    }
+    while ( mapGetdataRequested.find(nRequestId) != mapGetdataRequested.end());
+    std::map<uint256, bool> receivedBlocks;
+    BOOST_FOREACH(CInv inv, vInv)
+        receivedBlocks[inv.hash] = false;
+    mapGetdataRequested[nRequestId] = receivedBlocks;
+    mapGetblocksRequestIds[nRequestId] = getblocksRequestId;
+    PushMessage("getdata", nRequestId, vInv);
+}
+
 
 
 

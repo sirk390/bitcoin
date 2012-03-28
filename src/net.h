@@ -159,6 +159,10 @@ public:
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::multimap<int64, CInv> mapAskFor;
+    
+    std::map<unsigned int, std::pair<CBlockIndex, uint256> > mapGetblocksRequested;
+    std::map<unsigned int, std::map<uint256, bool> > mapGetdataRequested;
+    std::map<unsigned int, unsigned int> mapGetblocksRequestIds; // GetdataRequestId => GetblocksRequestId
 
     // publish and subscription
     std::vector<char> vfSubscribe;
@@ -569,6 +573,7 @@ public:
 
 
     void PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd);
+    void PushGetData(std::vector<CInv> vInv, unsigned int getblocksRequestId=0);
     bool IsSubscribed(unsigned int nChannel);
     void Subscribe(unsigned int nChannel, unsigned int nHops=0);
     void CancelSubscribe(unsigned int nChannel);
