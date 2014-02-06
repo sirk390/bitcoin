@@ -1,9 +1,14 @@
+// Copyright (c) 2011-2013 The Bitcoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef TRANSACTIONRECORD_H
 #define TRANSACTIONRECORD_H
 
 #include "uint256.h"
 
 #include <QList>
+#include <QString>
 
 class CWallet;
 class CWalletTx;
@@ -14,8 +19,8 @@ class TransactionStatus
 {
 public:
     TransactionStatus():
-            confirmed(false), sortKey(""), maturity(Mature),
-            matures_in(0), status(Offline), depth(0), open_for(0), cur_num_blocks(-1)
+        confirmed(false), sortKey(""), maturity(Mature),
+        matures_in(0), status(Offline), depth(0), open_for(0), cur_num_blocks(-1)
     { }
 
     enum Maturity
@@ -46,8 +51,10 @@ public:
     /** @name Reported status
        @{*/
     Status status;
-    int64 depth;
-    int64 open_for; /**< Timestamp if status==OpenUntilDate, otherwise number of blocks */
+    qint64 depth;
+    qint64 open_for; /**< Timestamp if status==OpenUntilDate, otherwise number
+                      of additional blocks that need to be mined before
+                      finalization */
     /**@}*/
 
     /** Current number of blocks (to know whether cached status is still valid) */
@@ -79,15 +86,15 @@ public:
     {
     }
 
-    TransactionRecord(uint256 hash, int64 time):
+    TransactionRecord(uint256 hash, qint64 time):
             hash(hash), time(time), type(Other), address(""), debit(0),
             credit(0), idx(0)
     {
     }
 
-    TransactionRecord(uint256 hash, int64 time,
+    TransactionRecord(uint256 hash, qint64 time,
                 Type type, const std::string &address,
-                int64 debit, int64 credit):
+                qint64 debit, qint64 credit):
             hash(hash), time(time), type(type), address(address), debit(debit), credit(credit),
             idx(0)
     {
@@ -101,11 +108,11 @@ public:
     /** @name Immutable transaction attributes
       @{*/
     uint256 hash;
-    int64 time;
+    qint64 time;
     Type type;
     std::string address;
-    int64 debit;
-    int64 credit;
+    qint64 debit;
+    qint64 credit;
     /**@}*/
 
     /** Subtransaction index, for sort key */
@@ -115,7 +122,10 @@ public:
     TransactionStatus status;
 
     /** Return the unique identifier for this transaction (part) */
-    std::string getTxID();
+    QString getTxID() const;
+
+    /** Format subtransaction id */
+    static QString formatSubTxId(const uint256 &hash, int vout);
 
     /** Update status from core wallet tx.
      */

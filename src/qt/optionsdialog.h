@@ -1,53 +1,59 @@
+// Copyright (c) 2011-2013 The Bitcoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef OPTIONSDIALOG_H
 #define OPTIONSDIALOG_H
 
 #include <QDialog>
 
-QT_BEGIN_NAMESPACE
-class QStackedWidget;
-class QListWidget;
-class QListWidgetItem;
-class QPushButton;
-QT_END_NAMESPACE
-class OptionsModel;
-class MainOptionsPage;
-class DisplayOptionsPage;
 class MonitoredDataMapper;
+class OptionsModel;
+class QValidatedLineEdit;
+
+namespace Ui {
+class OptionsDialog;
+}
 
 /** Preferences dialog. */
 class OptionsDialog : public QDialog
 {
     Q_OBJECT
+
 public:
-    explicit OptionsDialog(QWidget *parent=0);
+    explicit OptionsDialog(QWidget *parent);
+    ~OptionsDialog();
 
     void setModel(OptionsModel *model);
+    void setMapper();
 
-signals:
-
-public slots:
-    /** Change the current page to \a index. */
-    void changePage(int index);
+protected:
+    bool eventFilter(QObject *object, QEvent *event);
 
 private slots:
-    void okClicked();
-    void cancelClicked();
-    void applyClicked();
-    void enableApply();
-    void disableApply();
+    /* enable OK button */
+    void enableOkButton();
+    /* disable OK button */
+    void disableOkButton();
+    /* set OK button state (enabled / disabled) */
+    void setOkButtonState(bool fState);
+    void on_resetButton_clicked();
+    void on_okButton_clicked();
+    void on_cancelButton_clicked();
+
+    void showRestartWarning(bool fPersistent = false);
+    void clearStatusLabel();
+    void updateDisplayUnit();
+    void doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
+
+signals:
+    void proxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
 
 private:
-    QListWidget *contents_widget;
-    QStackedWidget *pages_widget;
+    Ui::OptionsDialog *ui;
     OptionsModel *model;
     MonitoredDataMapper *mapper;
-    QPushButton *apply_button;
-
-    // Pages
-    MainOptionsPage *main_page;
-    DisplayOptionsPage *display_page;
-
-    void setupMainPage();
+    bool fProxyIpValid;
 };
 
 #endif // OPTIONSDIALOG_H

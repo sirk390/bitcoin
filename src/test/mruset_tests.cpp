@@ -1,12 +1,15 @@
-#include <boost/test/unit_test.hpp>
-
-using namespace std;
-
 #include "mruset.h"
+
 #include "util.h"
+
+#include <set>
+
+#include <boost/test/unit_test.hpp>
 
 #define NUM_TESTS 16
 #define MAX_SIZE 100
+
+using namespace std;
 
 class mrutester
 {
@@ -71,7 +74,7 @@ int static permute(int n)
     return ret;
 }
 
-// Test that an mruset acts like a moving window, if no duplcate elements are added
+// Test that an mruset acts like a moving window, if no duplicate elements are added
 BOOST_AUTO_TEST_CASE(mruset_window)
 {
     mruset<int> mru(MAX_SIZE);

@@ -1,3 +1,7 @@
+// Copyright (c) 2011-2013 The Bitcoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "csvmodelwriter.h"
 
 #include <QAbstractItemModel>
@@ -6,7 +10,7 @@
 
 CSVModelWriter::CSVModelWriter(const QString &filename, QObject *parent) :
     QObject(parent),
-    filename(filename)
+    filename(filename), model(0)
 {
 }
 
@@ -27,8 +31,9 @@ void CSVModelWriter::addColumn(const QString &title, int column, int role)
 
 static void writeValue(QTextStream &f, const QString &value)
 {
-    // TODO: quoting if " or \n in string
-    f << "\"" << value << "\"";
+    QString escaped = value;
+    escaped.replace('"', "\"\"");
+    f << "\"" << escaped << "\"";
 }
 
 static void writeSep(QTextStream &f)
@@ -84,4 +89,3 @@ bool CSVModelWriter::write()
 
     return file.error() == QFile::NoError;
 }
-
