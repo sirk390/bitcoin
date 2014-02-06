@@ -1593,7 +1593,7 @@ public:
                 AppliesToMe() ||
                 GetAdjustedTime() < nRelayUntil)
             {
-                pnode->PushMessage("alert", NOTIFICATION, *this);
+                pnode->PushMessage("alert", *this);
                 return true;
             }
         }

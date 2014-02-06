@@ -79,7 +79,7 @@ void CNode::PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd)
     pindexLastGetBlocksBegin = pindexBegin;
     hashLastGetBlocksEnd = hashEnd;
 
-    PushMessage("getblocks", 1, CBlockLocator(pindexBegin), hashEnd);
+    PushMessage("getblocks", CBlockLocator(pindexBegin), hashEnd);
 }
 
 
@@ -433,7 +433,7 @@ void CNode::Subscribe(unsigned int nChannel, unsigned int nHops)
         CRITICAL_BLOCK(cs_vNodes)
             BOOST_FOREACH(CNode* pnode, vNodes)
                 if (pnode != this)
-                    pnode->PushMessage("subscribe", 1, nChannel, nHops);
+                    pnode->PushMessage("subscribe", nChannel, nHops);
     }
 
     vfSubscribe[nChannel] = true;
@@ -455,7 +455,7 @@ void CNode::CancelSubscribe(unsigned int nChannel)
         CRITICAL_BLOCK(cs_vNodes)
             BOOST_FOREACH(CNode* pnode, vNodes)
                 if (pnode != this)
-                    pnode->PushMessage("sub-cancel", 1, nChannel);
+                    pnode->PushMessage("sub-cancel", nChannel);
     }
 }
 
@@ -581,7 +581,7 @@ void CNode::PushVersion()
     CAddress addrYou = (fUseProxy ? CAddress(CService("0.0.0.0",0)) : addr);
     CAddress addrMe = (fUseProxy || !addrLocalHost.IsRoutable() ? CAddress(CService("0.0.0.0",0)) : addrLocalHost);
     RAND_bytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
-    PushMessage("version", 1, PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>()), nBestHeight);
 }
 

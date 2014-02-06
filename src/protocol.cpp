@@ -25,16 +25,14 @@ CMessageHeader::CMessageHeader()
     pchCommand[1] = 1;
     nMessageSize = -1;
     nChecksum = 0;
-    nRequestId = 0;
 }
 
-CMessageHeader::CMessageHeader(const char* pszCommand, unsigned int nMessageSizeIn, unsigned int nRequestIdIn)
+CMessageHeader::CMessageHeader(const char* pszCommand, unsigned int nMessageSizeIn)
 {
     memcpy(pchMessageStart, ::pchMessageStart, sizeof(pchMessageStart));
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
     nMessageSize = nMessageSizeIn;
     nChecksum = 0;
-    nRequestId = nRequestIdIn;
 }
 
 std::string CMessageHeader::GetCommand() const

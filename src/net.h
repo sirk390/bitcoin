@@ -171,12 +171,6 @@ public:
         vRecv.SetType(SER_NETWORK);
         vSend.SetVersion(209);
         vRecv.SetVersion(209);
-        // Version 0.6 obsoletes 20 Feb 2013
-         if (GetTime() > 1361318400)
-        {
-            vSend.SetVersion(61000);
-            vRecv.SetVersion(61000);
-        }
         nLastSend = 0;
         nLastRecv = 0;
         nLastSendEmpty = GetTime();
@@ -292,13 +286,13 @@ public:
 
 
 
-    void BeginMessage(const char* pszCommand, unsigned int nRequestId)
+    void BeginMessage(const char* pszCommand)
     {
         ENTER_CRITICAL_SECTION(cs_vSend);
         if (nHeaderStart != -1)
             AbortMessage();
         nHeaderStart = vSend.size();
-        vSend << CMessageHeader(pszCommand, 0, nRequestId);
+        vSend << CMessageHeader(pszCommand, 0);
         nMessageStart = vSend.size();
         if (fDebug) {
             printf("%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
@@ -339,7 +333,8 @@ public:
         uint256 hash = Hash(vSend.begin() + nMessageStart, vSend.end());
         unsigned int nChecksum = 0;
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
-        memcpy((char*)&vSend[nMessageStart] - sizeof(nChecksum), &nChecksum, sizeof(nChecksum));
+        assert(nMessageStart - nHeaderStart >= offsetof(CMessageHeader, nChecksum) + sizeof(nChecksum));
+        memcpy((char*)&vSend[nHeaderStart] + offsetof(CMessageHeader, nChecksum), &nChecksum, sizeof(nChecksum));
 
         if (fDebug) {
             printf("(%d bytes)\n", nSize);
@@ -366,11 +361,11 @@ public:
     void PushVersion();
 
 
-    void PushMessage(const char* pszCommand, unsigned int nRequestId)
+    void PushMessage(const char* pszCommand)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             EndMessage();
         }
         catch (...)
@@ -381,11 +376,11 @@ public:
     }
 
     template<typename T1>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1)
+    void PushMessage(const char* pszCommand, const T1& a1)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1;
             EndMessage();
         }
@@ -397,11 +392,11 @@ public:
     }
 
     template<typename T1, typename T2>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2;
             EndMessage();
         }
@@ -413,11 +408,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3;
             EndMessage();
         }
@@ -429,11 +424,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4;
             EndMessage();
         }
@@ -445,11 +440,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4 << a5;
             EndMessage();
         }
@@ -461,11 +456,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4 << a5 << a6;
             EndMessage();
         }
@@ -477,11 +472,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4 << a5 << a6 << a7;
             EndMessage();
         }
@@ -493,11 +488,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8;
             EndMessage();
         }
@@ -509,11 +504,11 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
-    void PushMessage(const char* pszCommand, unsigned int nRequestId, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
     {
         try
         {
-            BeginMessage(pszCommand, nRequestId);
+            BeginMessage(pszCommand);
             vSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8 << a9;
             EndMessage();
         }
@@ -525,8 +520,7 @@ public:
     }
 
 
-    void PushRequest(const char* pszCommand, 
-                     unsigned int nRequestId,
+    void PushRequest(const char* pszCommand,
                      void (*fn)(void*, CDataStream&), void* param1)
     {
         uint256 hashReply;
@@ -535,12 +529,11 @@ public:
         CRITICAL_BLOCK(cs_mapRequests)
             mapRequests[hashReply] = CRequestTracker(fn, param1);
 
-        PushMessage(pszCommand, nRequestId, hashReply);
+        PushMessage(pszCommand, hashReply);
     }
 
     template<typename T1>
     void PushRequest(const char* pszCommand, const T1& a1,
-                     unsigned int nRequestId,
                      void (*fn)(void*, CDataStream&), void* param1)
     {
         uint256 hashReply;
@@ -549,12 +542,11 @@ public:
         CRITICAL_BLOCK(cs_mapRequests)
             mapRequests[hashReply] = CRequestTracker(fn, param1);
 
-        PushMessage(pszCommand, nRequestId, hashReply, a1);
+        PushMessage(pszCommand, hashReply, a1);
     }
 
     template<typename T1, typename T2>
     void PushRequest(const char* pszCommand, const T1& a1, const T2& a2,
-                     unsigned int nRequestId,
                      void (*fn)(void*, CDataStream&), void* param1)
     {
         uint256 hashReply;
@@ -563,7 +555,7 @@ public:
         CRITICAL_BLOCK(cs_mapRequests)
             mapRequests[hashReply] = CRequestTracker(fn, param1);
 
-        PushMessage(pszCommand, nRequestId, hashReply, a1, a2);
+        PushMessage(pszCommand, hashReply, a1, a2);
     }
 
 
